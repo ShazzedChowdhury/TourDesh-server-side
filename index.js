@@ -2,7 +2,6 @@ const dotenv = require("dotenv");
 dotenv.config();
 const express = require("express");
 const cors = require("cors");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const {
   MongoClient,
   ServerApiVersion,
@@ -12,7 +11,10 @@ const {
 
 var admin = require("firebase-admin");
 
-var serviceAccount = require("./admin-key.json");
+var serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8")
+);
+
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -60,8 +62,7 @@ const verifyFirebaseToken = async (req, res, next) => {
 async function run() {
   try {
     await client.connect();
-    const db = client.db("db_name");
-    const booksCollection = db.collection("books");
+     const db = client.db("LifeDropDb");
     const userCollection = db.collection("users");
 
     const verifyAdmin = async (req, res, next) => {
@@ -76,12 +77,7 @@ async function run() {
       }
     };
 
-    app.post("/add-book", async (req, res) => {
-      // Book Title, Cover Image, Author Name, Genre, Pickup Location, Available Until
-      const data = req.body;
-      const result = await booksCollection.insertOne(data);
-      res.send(result);
-    });
+   
 
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
