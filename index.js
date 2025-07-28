@@ -155,6 +155,26 @@ async function run() {
       }
     });
 
+    app.get("/donation-request/:id", verifyFirebaseToken, async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const request = await donationRequestCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!request) {
+          return res
+            .status(404)
+            .send({ message: "Donation request not found" });
+        }
+
+        res.send(request);
+      } catch (error) {
+        console.error("Error fetching donation request by ID:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
 
 
     app.post("/donation-request", verifyFirebaseToken, async (req, res) => {
@@ -171,6 +191,35 @@ async function run() {
       }
     });
 
+    app.patch(
+      "/update-donation-request/:id",
+      verifyFirebaseToken,
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+
+          const updateData = req.body;
+
+          const result = await donationRequestCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updateData }
+          );
+
+          if (result.matchedCount === 0) {
+            return res
+              .status(404)
+              .send({ message: "Donation request not found" });
+          }
+
+          res.send(result);
+        } catch (error) {
+          console.error("Error updating donation request:", error);
+          res
+            .status(500)
+            .send({ message: "Server error", error: error.message });
+        }
+      }
+    );
 
     console.log("connected");
   } finally {
