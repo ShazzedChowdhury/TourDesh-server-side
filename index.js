@@ -138,7 +138,7 @@ async function run() {
     );
 
     //donation related api
-    app.get("/my-donation-requests", verifyFirebaseToken, async (req, res) => {
+    app.get("/recent-donation-requests", verifyFirebaseToken, async (req, res) => {
       try {
         const email = req.firebaseUser.email;
         console.log(email)
@@ -154,6 +154,37 @@ async function run() {
         res.status(500).send({ message: "Server error", error: error.message });
       }
     });
+
+     app.get(
+       "/my-donation-requests",
+       verifyFirebaseToken,
+       async (req, res) => {
+         try {
+           const email = req.firebaseUser.email;
+           const {page, filter} = req.query;
+           const query = {
+             requesterEmail: email
+           };
+           
+           if(filter && filter !== "all") {
+            query.donationStatus = filter
+           }
+           const totalCount = await donationRequestCollection.countDocuments(query);
+           const requests = await donationRequestCollection
+             .find(query)
+             .skip((page-1) * 5)
+             .limit(5)
+             .toArray();
+
+           res.send({requests, totalCount});
+         } catch (error) {
+           console.error("Error fetching donation requests:", error);
+           res
+             .status(500)
+             .send({ message: "Server error", error: error.message });
+         }
+       }
+     );
 
     app.get("/donation-request/:id", verifyFirebaseToken, async (req, res) => {
       try {
@@ -180,7 +211,7 @@ async function run() {
     app.post("/donation-request", verifyFirebaseToken, async (req, res) => {
       try {
         const donationData = req.body;
-        // Optional: You can attach user email or UID to the request
+
         donationData.createdAt = new Date().toISOString();
 
         const result = await donationRequestCollection.insertOne(donationData);
