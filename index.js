@@ -138,6 +138,25 @@ async function run() {
     );
 
     //donation related api
+    app.get("/my-donation-requests", verifyFirebaseToken, async (req, res) => {
+      try {
+        const email = req.firebaseUser.email;
+        console.log(email)
+        const requests = await donationRequestCollection
+          .find({ requesterEmail: email })
+          .sort({ createdAt: -1 }) // Most recent first
+          .limit(3)
+          .toArray();
+
+        res.send(requests);
+      } catch (error) {
+        console.error("Error fetching donation requests:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
+
     app.post("/donation-request", verifyFirebaseToken, async (req, res) => {
       try {
         const donationData = req.body;
