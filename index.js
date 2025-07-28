@@ -137,6 +137,20 @@ async function run() {
       }
     );
 
+    //admin dashboard stats
+    app.get("/admin/stats", verifyFirebaseToken, async (req, res) => {
+      try {
+        const totalDonors = await userCollection.countDocuments({ role: "donor"});
+        const totalRequests = await donationRequestCollection.countDocuments() 
+          
+
+        res.send({totalDonors, totalRequests});
+      } catch (error) {
+        console.error("Error fetching donation requests:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
     //donation related api
     app.get("/recent-donation-requests", verifyFirebaseToken, async (req, res) => {
       try {
