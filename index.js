@@ -63,6 +63,7 @@ async function run() {
   try {
     await client.connect();
      const db = client.db("LifeDropDb");
+     const donationRequestCollection = db.collection("donationRequests");
     const userCollection = db.collection("users");
 
     const verifyAdmin = async (req, res, next) => {
@@ -104,7 +105,7 @@ async function run() {
       const user = await userCollection.findOne({
         email: req.firebaseUser.email,
       });
-      res.send({ msg: "ok", role: user.role, status: "active" });
+      res.send({ role: user.role });
     });
 
     app.get(
@@ -136,6 +137,22 @@ async function run() {
       }
     );
 
+    //donation related api
+    app.post("/donation-request", verifyFirebaseToken, async (req, res) => {
+      try {
+        const donationData = req.body;
+        // Optional: You can attach user email or UID to the request
+        donationData.createdAt = new Date().toISOString();
+
+        const result = await donationRequestCollection.insertOne(donationData);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error("Error creating donation request:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+
     console.log("connected");
   } finally {
   }
@@ -145,13 +162,11 @@ run().catch(console.dir);
 
 // Root route
 app.get("/", async (req, res) => {
-  res.send({ msg: "hello" });
+  res.send('server is running.....')
 });
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
 });
 
-/*
-1. authorization
-*/
+
