@@ -203,6 +203,13 @@ async function run() {
       }
     });
 
+     app.get("/pending-donation-requests", async (req, res) => {
+       const data = await donationRequestCollection
+         .find({ donationStatus: "pending" })
+         .toArray();
+       res.send(data);
+     });
+
      app.get(
        "/my-donation-requests",
        verifyFirebaseToken,
