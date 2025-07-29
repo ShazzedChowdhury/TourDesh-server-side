@@ -117,8 +117,7 @@ async function run() {
         const query = { email: { $ne: req.firebaseUser.email } };
         
         if(filter && filter !== "all") {
-          query.status = filter
-          console.log('filter', filter)
+          query.status = filter         
         }
         const totalCount = await userCollection.countDocuments(query);
         const users = await userCollection
@@ -127,7 +126,6 @@ async function run() {
           .limit(5)
           .toArray();
 
-          console.log('users', users)
         res.send({users, totalCount});
       }
     );
@@ -175,6 +173,30 @@ async function run() {
           .toArray();
 
         res.send(requests);
+      } catch (error) {
+        console.error("Error fetching donation requests:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
+
+    app.get("/all-donation-requests", verifyFirebaseToken, async (req, res) => {
+      try {
+        const { page, filter } = req.query;
+        const query = {};
+
+        if (filter && filter !== "all") {
+          query.donationStatus = filter;
+        }
+        const totalCount = await donationRequestCollection.countDocuments(
+          query
+        );
+        const requests = await donationRequestCollection
+          .find(query)
+          .skip((page - 1) * 5)
+          .limit(5)
+          .toArray();
+
+        res.send({ requests, totalCount });
       } catch (error) {
         console.error("Error fetching donation requests:", error);
         res.status(500).send({ message: "Server error", error: error.message });
