@@ -146,6 +146,38 @@ async function run() {
         res.send(result);
       }
     );
+    app.patch(
+      "/update-user-status",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { email, status } = req.body;
+        const result = await userCollection.updateOne(
+          { email: email },
+          {
+            $set: { status },
+          }
+        );
+
+        res.send(result);
+      }
+    );
+
+    app.patch(
+      "/profile-update",
+      verifyFirebaseToken,
+      async (req, res) => {
+        const { email, ...data } = req.body;
+        const result = await userCollection.updateOne(
+          { email: email },
+          {
+            $set: data,
+          }
+        );
+
+        res.send(result);
+      }
+    );
 
     //admin dashboard stats
     app.get("/admin/stats", verifyFirebaseToken, async (req, res) => {
@@ -337,6 +369,21 @@ async function run() {
         res.send(data);
       }
     );
+
+    app.delete("/donation-request/:id", verifyFirebaseToken, async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const request = await donationRequestCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send(request);
+      } catch (error) {
+        console.error("Error fetching donation request by ID:", error);
+        res.status(500).send({ message: "Server error", error: error.message });
+      }
+    });
 
     console.log("connected");
   } finally {
