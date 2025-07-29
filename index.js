@@ -109,14 +109,26 @@ async function run() {
     });
 
     app.get(
-      "/get-users",
+      "/all-users",
       verifyFirebaseToken,
       verifyAdmin,
       async (req, res) => {
+        const {page, filter} = req.query;
+        const query = { email: { $ne: req.firebaseUser.email } };
+        
+        if(filter && filter !== "all") {
+          query.status = filter
+          console.log('filter', filter)
+        }
+        const totalCount = await userCollection.countDocuments(query);
         const users = await userCollection
-          .find({ email: { $ne: req.firebaseUser.email } })
+          .find(query)
+          .skip((page-1) * 5)
+          .limit(5)
           .toArray();
-        res.send(users);
+
+          console.log('users', users)
+        res.send({users, totalCount});
       }
     );
 
@@ -186,8 +198,8 @@ async function run() {
            const totalCount = await donationRequestCollection.countDocuments(query);
            const requests = await donationRequestCollection
              .find(query)
-             .skip((page-1) * 5)
-             .limit(5)
+             .skip((page-1) * 3)
+             .limit(3)
              .toArray();
 
            res.send({requests, totalCount});
