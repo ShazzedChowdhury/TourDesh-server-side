@@ -9,19 +9,6 @@ const {
   ChangeStream,
 } = require("mongodb");
 
-var admin = require("firebase-admin");
-
-var serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8")
-);
-
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-// const serviceAccount = require("./admin-key.json");
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -38,46 +25,25 @@ const client = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 
-const verifyFirebaseToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  console.log("🚀 ~ verifyFirebaseToken ~ authHeader:", authHeader);
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized: No token provided" });
-  }
-
-  const idToken = authHeader.split(" ")[1];
-
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.firebaseUser = decodedToken; // You can access user info like uid, email, etc.
-    next();
-  } catch (error) {
-    return res
-      .status(401)
-      .json({ message: "Unauthorized: Invalid token from catch" });
-  }
-};
 
 async function run() {
   try {
-    await client.connect();
      const db = client.db("LifeDropDb");
      const donationRequestCollection = db.collection("donationRequests");
      const blogsCollection = db.collection("blogs");
     const userCollection = db.collection("users");
 
-    const verifyAdmin = async (req, res, next) => {
-      const user = await userCollection.findOne({
-        email: req.firebaseUser.email,
-      });
+    // const verifyAdmin = async (req, res, next) => {
+    //   const user = await userCollection.findOne({
+    //     email: req.firebaseUser.email,
+    //   });
 
-      if (user.role === "admin") {
-        next();
-      } else {
-        res.status(403).send({ msg: "unauthorized" });
-      }
-    };
+    //   if (user.role === "admin") {
+    //     next();
+    //   } else {
+    //     res.status(403).send({ msg: "unauthorized" });
+    //   }
+    // };
 
    
 
@@ -102,7 +68,7 @@ async function run() {
       }
     });
 
-    app.get("/get-user-role", verifyFirebaseToken, async (req, res) => {
+    app.get("/get-user-role",  async (req, res) => {
       const user = await userCollection.findOne({
         email: req.firebaseUser.email,
       });
@@ -110,9 +76,7 @@ async function run() {
     });
 
     app.get(
-      "/all-users",
-      verifyFirebaseToken,
-      verifyAdmin,
+      "/all-users",     
       async (req, res) => {
         const {page, filter} = req.query;
         const query = { email: { $ne: req.firebaseUser.email } };
@@ -132,9 +96,7 @@ async function run() {
     );
 
     app.patch(
-      "/update-role",
-      verifyFirebaseToken,
-      verifyAdmin,
+      "/update-role",     
       async (req, res) => {
         const { email, role } = req.body;
         const result = await userCollection.updateOne(
@@ -149,8 +111,8 @@ async function run() {
     );
     app.patch(
       "/update-user-status",
-      verifyFirebaseToken,
-      verifyAdmin,
+      
+     
       async (req, res) => {
         const { email, status } = req.body;
         const result = await userCollection.updateOne(
@@ -164,335 +126,6 @@ async function run() {
       }
     );
 
-    app.patch(
-      "/profile-update",
-      verifyFirebaseToken,
-      async (req, res) => {
-        const { email, ...data } = req.body;
-        const result = await userCollection.updateOne(
-          { email: email },
-          {
-            $set: data,
-          }
-        );
-
-        res.send(result);
-      }
-    );
-
-    //admin dashboard stats
-    app.get("/admin/stats", verifyFirebaseToken, async (req, res) => {
-      try {
-        const totalDonors = await userCollection.countDocuments({ role: "donor"});
-        const totalRequests = await donationRequestCollection.countDocuments() 
-          
-
-        res.send({totalDonors, totalRequests});
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-    //donation related api
-    app.get("/recent-donation-requests", verifyFirebaseToken, async (req, res) => {
-      try {
-        const email = req.firebaseUser.email;
-        console.log(email)
-        const requests = await donationRequestCollection
-          .find({ requesterEmail: email })
-          .sort({ createdAt: -1 }) // Most recent first
-          .limit(3)
-          .toArray();
-
-        res.send(requests);
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-    app.get("/blogs", verifyFirebaseToken, async (req, res) => {
-      try {
-        const { filter } = req.query;
-        const query = {};
-
-        if (filter && filter !== "all") {
-          query.status = filter;
-        }
-       
-        const requests = await blogsCollection
-          .find(query)
-          .toArray();
-
-        res.send(requests);
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-    app.get("/all-donation-requests", verifyFirebaseToken, async (req, res) => {
-      try {
-        const { page, filter } = req.query;
-        const query = {};
-
-        if (filter && filter !== "all") {
-          query.donationStatus = filter;
-        }
-        const totalCount = await donationRequestCollection.countDocuments(
-          query
-        );
-        const requests = await donationRequestCollection
-          .find(query)
-          .skip((page - 1) * 5)
-          .limit(5)
-          .toArray();
-
-        res.send({ requests, totalCount });
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-     app.get("/pending-donation-requests", async (req, res) => {
-       const data = await donationRequestCollection
-         .find({ donationStatus: "pending" })
-         .toArray();
-       res.send(data);
-     });
-
-     app.get(
-       "/my-donation-requests",
-       verifyFirebaseToken,
-       async (req, res) => {
-         try {
-           const email = req.firebaseUser.email;
-           const {page, filter} = req.query;
-           const query = {
-             requesterEmail: email
-           };
-           
-           if(filter && filter !== "all") {
-            query.donationStatus = filter
-           }
-           const totalCount = await donationRequestCollection.countDocuments(query);
-           const requests = await donationRequestCollection
-             .find(query)
-             .skip((page-1) * 3)
-             .limit(3)
-             .toArray();
-
-           res.send({requests, totalCount});
-         } catch (error) {
-           console.error("Error fetching donation requests:", error);
-           res
-             .status(500)
-             .send({ message: "Server error", error: error.message });
-         }
-       }
-     );
-
-    app.get("/donation-request/:id", verifyFirebaseToken, async (req, res) => {
-      try {
-        const { id } = req.params;
-
-        const request = await donationRequestCollection.findOne({
-          _id: new ObjectId(id),
-        });
-
-        if (!request) {
-          return res
-            .status(404)
-            .send({ message: "Donation request not found" });
-        }
-
-        res.send(request);
-      } catch (error) {
-        console.error("Error fetching donation request by ID:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-
-    app.get("/donors-search", async(req, res) => {
-      try {
-        const searchData = req.query;
-        console.log("search....",searchData)
-        const requests = await donationRequestCollection
-          .find(searchData)
-          .toArray();
-
-        res.send(requests);
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-     app.get("/blogs/:id", verifyFirebaseToken, async (req, res) => {
-       try {
-         const { id } = req.params;
-
-         const request = await blogsCollection.findOne({
-           _id: new ObjectId(id),
-         });
-
-         res.send(request);
-       } catch (error) {
-         console.error("Error fetching donation request by ID:", error);
-         res
-           .status(500)
-           .send({ message: "Server error", error: error.message });
-       }
-     });
-
-    app.post("/donation-request", verifyFirebaseToken, async (req, res) => {
-      try {
-        const donationData = req.body;
-
-        donationData.createdAt = new Date().toISOString();
-
-        const result = await donationRequestCollection.insertOne(donationData);
-        res.status(201).send(result);
-      } catch (error) {
-        console.error("Error creating donation request:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-
-    app.get("/published-blogs", async (req, res) => {
-      try {
-          
-        const requests = await blogsCollection
-          .find({
-            status: "published",
-          })
-          .toArray();
-
-        res.send(requests);
-      } catch (error) {
-        console.error("Error fetching donation requests:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-
-    app.post("/blogs", verifyFirebaseToken, async (req, res) => {
-      try {
-        const blogData = req.body;
-
-
-        const result = await blogsCollection.insertOne(blogData);
-        res.status(201).send(result);
-      } catch (error) {
-        console.error("Error creating donation request:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
-
-    app.patch(
-      "/update-blogs-status/:id",
-      verifyFirebaseToken,
-      async (req, res) => {
-        const query = { _id: new ObjectId(req.params.id) };
-        const { status } = req.body;
-        console.log("status", status);
-        const data = await blogsCollection.updateOne(query, {
-          $set: {
-             status,
-          },
-        });
-        res.send(data);
-      }
-    );
-
-    app.patch(
-      "/update-donation-request/:id",
-      verifyFirebaseToken,
-      async (req, res) => {
-        try {
-          const { id } = req.params;
-
-          const updateData = req.body;
-
-          const result = await donationRequestCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: updateData }
-          );
-
-          if (result.matchedCount === 0) {
-            return res
-              .status(404)
-              .send({ message: "Donation request not found" });
-          }
-
-          res.send(result);
-        } catch (error) {
-          console.error("Error updating donation request:", error);
-          res
-            .status(500)
-            .send({ message: "Server error", error: error.message });
-        }
-      }
-    );
-
-    app.patch(
-      "/update-request-status/:id",
-      verifyFirebaseToken,
-      async (req, res) => {
-        const query = { _id: new ObjectId(req.params.id) };
-        const { status } = req.body;
-        console.log("status",status)
-        const data = await donationRequestCollection.updateOne(query, {
-          $set: {
-           donationStatus: status
-          },
-        });
-        res.send(data);
-      }
-    );
-
-     app.delete(
-       "/blogs/:id",
-       verifyFirebaseToken,
-       async (req, res) => {
-         try {
-           const { id } = req.params;
-
-           const request = await blogsCollection.deleteOne({
-             _id: new ObjectId(id),
-           });
-
-           res.send(request);
-         } catch (error) {
-           console.error("Error fetching donation request by ID:", error);
-           res
-             .status(500)
-             .send({ message: "Server error", error: error.message });
-         }
-       }
-     );
-
-
-    app.delete("/donation-request/:id", verifyFirebaseToken, async (req, res) => {
-      try {
-        const { id } = req.params;
-
-        const request = await donationRequestCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-
-        res.send(request);
-      } catch (error) {
-        console.error("Error fetching donation request by ID:", error);
-        res.status(500).send({ message: "Server error", error: error.message });
-      }
-    });
-
     console.log("connected");
   } finally {
   }
@@ -502,7 +135,7 @@ run().catch(console.dir);
 
 // Root route
 app.get("/", async (req, res) => {
-  res.send('server is running.....')
+  res.send('TourDesh server is running.....')
 });
 
 app.listen(PORT, () => {
