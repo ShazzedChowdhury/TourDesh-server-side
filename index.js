@@ -2,6 +2,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const {
   MongoClient,
   ServerApiVersion,
@@ -16,6 +17,28 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+//custom middleware
+const verifyJWT = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if( !authHeader || !authHeader.startWith("Bearer ")) {
+      res.status(401).send({message: "Unauthorized"})
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    //verify the token
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if(err) {
+        res.status(403).send({message: "Forbidden"})
+      }
+
+
+      req.user = decoded;
+      next()
+    })
+}
+
 // MongoDB Connection
 const client = new MongoClient(process.env.MONGODB_URI, {
   serverApi: {
@@ -25,12 +48,23 @@ const client = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 
+var admin = require("firebase-admin");
+
+var serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8")
+);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
 
 async function run() {
   try {
-     const db = client.db("LifeDropDb");
-     const donationRequestCollection = db.collection("donationRequests");
-     const blogsCollection = db.collection("blogs");
+    const db = client.db("LifeDropDb");
+    const donationRequestCollection = db.collection("donationRequests");
+    const blogsCollection = db.collection("blogs");
     const userCollection = db.collection("users");
 
     // const verifyAdmin = async (req, res, next) => {
@@ -45,7 +79,31 @@ async function run() {
     //   }
     // };
 
-   
+    // Verify Firebase token & issue custom JWT
+    app.post("/jwt", async (req, res) => {
+      const { idToken } = req.body;
+      console.log("idToken",idToken)
+      try {
+        // Verify Firebase token
+        const decoded = await admin.auth().verifyIdToken(idToken);
+
+        // Example payload (you can add role later)
+        const payload = {
+          uid: decoded.uid,
+          email: decoded.email,
+        };
+
+        console.log(payload)
+
+        // Create custom JWT
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+
+        res.json({ token });
+      } catch (error) {
+        console.error("JWT creation error:", error);
+        res.status(401).json({ message: "Invalid Firebase token" });
+      }
+    });
 
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
@@ -68,51 +126,44 @@ async function run() {
       }
     });
 
-    app.get("/get-user-role",  async (req, res) => {
+    app.get("/get-user-role", async (req, res) => {
       const user = await userCollection.findOne({
         email: req.firebaseUser.email,
       });
       res.send({ role: user.role });
     });
 
-    app.get(
-      "/all-users",     
-      async (req, res) => {
-        const {page, filter} = req.query;
-        const query = { email: { $ne: req.firebaseUser.email } };
-        
-        if(filter && filter !== "all") {
-          query.status = filter         
+    app.get("/all-users", async (req, res) => {
+      const { page, filter } = req.query;
+      const query = { email: { $ne: req.firebaseUser.email } };
+
+      if (filter && filter !== "all") {
+        query.status = filter;
+      }
+      const totalCount = await userCollection.countDocuments(query);
+      const users = await userCollection
+        .find(query)
+        .skip((page - 1) * 5)
+        .limit(5)
+        .toArray();
+
+      res.send({ users, totalCount });
+    });
+
+    app.patch("/update-role", async (req, res) => {
+      const { email, role } = req.body;
+      const result = await userCollection.updateOne(
+        { email: email },
+        {
+          $set: { role },
         }
-        const totalCount = await userCollection.countDocuments(query);
-        const users = await userCollection
-          .find(query)
-          .skip((page-1) * 5)
-          .limit(5)
-          .toArray();
+      );
 
-        res.send({users, totalCount});
-      }
-    );
-
-    app.patch(
-      "/update-role",     
-      async (req, res) => {
-        const { email, role } = req.body;
-        const result = await userCollection.updateOne(
-          { email: email },
-          {
-            $set: { role },
-          }
-        );
-
-        res.send(result);
-      }
-    );
+      res.send(result);
+    });
     app.patch(
       "/update-user-status",
-      
-     
+
       async (req, res) => {
         const { email, status } = req.body;
         const result = await userCollection.updateOne(
