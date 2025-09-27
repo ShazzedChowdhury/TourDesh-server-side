@@ -62,9 +62,9 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 async function run() {
   try {
-    const db = client.db("LifeDropDb");
+    const db = client.db("TourDeshDB");
     const donationRequestCollection = db.collection("donationRequests");
-    const blogsCollection = db.collection("blogs");
+    const packageCollection = db.collection("packages");
     const userCollection = db.collection("users");
 
     // const verifyAdmin = async (req, res, next) => {
@@ -128,10 +128,21 @@ async function run() {
 
     app.get("/get-user-role", async (req, res) => {
       const user = await userCollection.findOne({
-        email: req.firebaseUser.email,
+        email: req.query.email,
       });
       res.send({ role: user.role });
     });
+
+    //Admin apis
+    app.post('/add-packages', async( req, res) => {
+       try{
+         const packageInfo = req.body;
+        const result = await packageCollection.insertOne(packageInfo)
+        res.send(result)
+       } catch (err) {
+        res.status(500).send({message: err.message})
+       }
+    })
 
     app.get("/all-users", async (req, res) => {
       const { page, filter } = req.query;
