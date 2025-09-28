@@ -89,16 +89,15 @@ async function run() {
         const decoded = await admin.auth().verifyIdToken(idToken);
 
         //get the user from user collection by email
-        const user = await userCollection.findOne({email: decoded.email})
+        const user = await userCollection.findOne({ email: decoded.email });
 
         // Example payload (you can add role later)
         const payload = {
           uid: decoded.uid,
           name: decoded.name,
           email: decoded.email,
-          role: user.role
+          role: user.role,
         };
-
 
         // Create custom JWT
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -140,64 +139,64 @@ async function run() {
 
     //Admin apis
     // GET /users?search=keyword
-    app.get('/users',verifyJWT, async (req, res) => {
-      try{
+    app.get("/users", verifyJWT, async (req, res) => {
+      try {
         const search = req.query.search || "";
         const skipEmail = req.user.email;
         const query = {
-          email: { $ne: skipEmail},
+          email: { $ne: skipEmail },
           $or: [
-            {userName:{ $regex: search, $options: "i"}},
-            {email: {$regex: search, $options: "i"}}
-          ]
-        }
+            { userName: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+          ],
+        };
         const result = await userCollection.find(query).toArray();
-        res.send(result)
+        res.send(result);
       } catch (err) {
-      res.status(500).send({message: err.massage})
-    }
-    })
+        res.status(500).send({ message: err.massage });
+      }
+    });
 
     //Get all applications
-     app.get("/applications", async( req, res) => {
-       try {
-         const result = await applicationsCollection
-           .aggregate([
-             {
-               $lookup: {
-                 from: "users", // users collection
-                 localField: "email", // email in applications
-                 foreignField: "email", // email in users
-                 as: "userInfo", // result array
-               },
-             },
-             {
-               $unwind: {
-                 path: "$userInfo",
-                 preserveNullAndEmptyArrays: true, // in case user not found
-               },
-             },
-             {
-               $addFields: {
-                 role: "$userInfo.role", // add role field
-               },
-             },
-             {
-               $project: {
-                 userInfo: 0, // remove the extra joined object
-               },
-             },
-           ])
-           .toArray();
+    app.get("/applications", async (req, res) => {
+      try {
+        const result = await applicationsCollection
+          .aggregate([
+            {
+              $lookup: {
+                from: "users", // users collection
+                localField: "email", // email in applications
+                foreignField: "email", // email in users
+                as: "userInfo", // result array
+              },
+            },
+            {
+              $unwind: {
+                path: "$userInfo",
+                preserveNullAndEmptyArrays: true, // in case user not found
+              },
+            },
+            {
+              $addFields: {
+                role: "$userInfo.role", // add role field
+              },
+            },
+            {
+              $project: {
+                userInfo: 0, // remove the extra joined object
+              },
+            },
+          ])
+          .toArray();
 
-         res.status(200).send(result);
-       } catch (error) {
-         res.status(500).json({
-           success: false,
-           message: error.message,
-         });
-       }
-    })
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: error.message,
+        });
+      }
+    });
 
     app.post("/add-package", async (req, res) => {
       try {
@@ -226,19 +225,25 @@ async function run() {
       res.send({ users, totalCount });
     });
 
-   
+    // Update user role by email
+    app.patch("/users/:email", async (req, res) => {
+      try{
+        const email = req.params.email;
+        const { role } = req.body;
 
-    app.patch("/update-role", async (req, res) => {
-      const { email, role } = req.body;
-      const result = await userCollection.updateOne(
-        { email: email },
-        {
-          $set: { role },
-        }
-      );
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: {role} },
+          {upsert: false}
+        );
 
-      res.send(result);
+        res.send(result)
+      } catch (err) {
+        res.status(500).send({ message: "Failed to update role", err });
+      }
     });
+
+
     app.patch(
       "/update-user-status",
 
