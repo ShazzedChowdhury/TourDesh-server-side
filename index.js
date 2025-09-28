@@ -64,7 +64,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 async function run() {
   try {
     const db = client.db("TourDeshDB");
-    const donationRequestCollection = db.collection("donationRequests");
+    const applicationsCollection = db.collection("Applications");
     const packageCollection = db.collection("packages");
     const userCollection = db.collection("users");
 
@@ -139,13 +139,13 @@ async function run() {
     });
 
     //Admin apis
-
     // GET /users?search=keyword
     app.get('/users',verifyJWT, async (req, res) => {
       try{
         const search = req.query.search || "";
-       
+        const skipEmail = req.user.email;
         const query = {
+          email: { $ne: skipEmail},
           $or: [
             {userName:{ $regex: search, $options: "i"}},
             {email: {$regex: search, $options: "i"}}
@@ -156,6 +156,47 @@ async function run() {
       } catch (err) {
       res.status(500).send({message: err.massage})
     }
+    })
+
+    //Get all applications
+     app.get("/applications", async( req, res) => {
+       try {
+         const result = await applicationsCollection
+           .aggregate([
+             {
+               $lookup: {
+                 from: "users", // users collection
+                 localField: "email", // email in applications
+                 foreignField: "email", // email in users
+                 as: "userInfo", // result array
+               },
+             },
+             {
+               $unwind: {
+                 path: "$userInfo",
+                 preserveNullAndEmptyArrays: true, // in case user not found
+               },
+             },
+             {
+               $addFields: {
+                 role: "$userInfo.role", // add role field
+               },
+             },
+             {
+               $project: {
+                 userInfo: 0, // remove the extra joined object
+               },
+             },
+           ])
+           .toArray();
+
+         res.status(200).send(result);
+       } catch (error) {
+         res.status(500).json({
+           success: false,
+           message: error.message,
+         });
+       }
     })
 
     app.post("/add-package", async (req, res) => {
@@ -184,6 +225,8 @@ async function run() {
 
       res.send({ users, totalCount });
     });
+
+   
 
     app.patch("/update-role", async (req, res) => {
       const { email, role } = req.body;
