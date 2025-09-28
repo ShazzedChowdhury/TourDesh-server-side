@@ -243,6 +243,18 @@ async function run() {
       }
     });
 
+    //Delete application by id
+    app.delete("/applications/:id", async( req, res) => {
+      try{
+        const {id} = req.params;
+
+        const result = await applicationsCollection.deleteOne({ _id: new ObjectId(id)});
+        res.send(result)
+      } catch(err) {
+        res.status(500).send({message: "Failed to delete application", err})
+      }
+    })
+
 
     app.patch(
       "/update-user-status",
