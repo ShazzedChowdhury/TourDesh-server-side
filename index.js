@@ -20,8 +20,9 @@ app.use(express.json());
 //custom middleware
 const verifyJWT = async (req, res, next) => {
     const authHeader = req.headers.authorization;
+    console.log("tokem from headers",authHeader)
 
-    if( !authHeader || !authHeader.startWith("Bearer ")) {
+    if( !authHeader || !authHeader.startsWith("Bearer ")) {
       res.status(401).send({message: "Unauthorized"})
     }
 
@@ -82,18 +83,22 @@ async function run() {
     // Verify Firebase token & issue custom JWT
     app.post("/jwt", async (req, res) => {
       const { idToken } = req.body;
-      console.log("idToken",idToken)
+      console.log("idToken", idToken);
       try {
         // Verify Firebase token
         const decoded = await admin.auth().verifyIdToken(idToken);
 
+        //get the user from user collection by email
+        const user = await userCollection.findOne({email: decoded.email})
+
         // Example payload (you can add role later)
         const payload = {
           uid: decoded.uid,
+          name: decoded.name,
           email: decoded.email,
+          role: user.role
         };
 
-        console.log(payload)
 
         // Create custom JWT
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
@@ -134,15 +139,34 @@ async function run() {
     });
 
     //Admin apis
-    app.post('/add-packages', async( req, res) => {
-       try{
-         const packageInfo = req.body;
-        const result = await packageCollection.insertOne(packageInfo)
+
+    // GET /users?search=keyword
+    app.get('/users',verifyJWT, async (req, res) => {
+      try{
+        const search = req.query.search || "";
+       
+        const query = {
+          $or: [
+            {userName:{ $regex: search, $options: "i"}},
+            {email: {$regex: search, $options: "i"}}
+          ]
+        }
+        const result = await userCollection.find(query).toArray();
         res.send(result)
-       } catch (err) {
-        res.status(500).send({message: err.message})
-       }
+      } catch (err) {
+      res.status(500).send({message: err.massage})
+    }
     })
+
+    app.post("/add-package", async (req, res) => {
+      try {
+        const packageInfo = req.body;
+        const result = await packageCollection.insertOne(packageInfo);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: err.message });
+      }
+    });
 
     app.get("/all-users", async (req, res) => {
       const { page, filter } = req.query;
