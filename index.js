@@ -119,13 +119,7 @@ async function run() {
       });
 
       if (find_result) {
-        usersCollection.updateOne(
-          { email: userData.email },
-          {
-            $inc: { loginCount: 1 },
-          }
-        );
-        res.send({ msg: "user already exist" });
+        return res.send({ msg: "user already exist" });
       } else {
         const result = await usersCollection.insertOne(userData);
         res.send(result);
@@ -234,23 +228,6 @@ async function run() {
       }
     });
 
-    app.get("/all-users", async (req, res) => {
-      const { page, filter } = req.query;
-      const query = { email: { $ne: req.firebaseUser.email } };
-
-      if (filter && filter !== "all") {
-        query.status = filter;
-      }
-      const totalCount = await usersCollection.countDocuments(query);
-      const users = await usersCollection
-        .find(query)
-        .skip((page - 1) * 5)
-        .limit(5)
-        .toArray();
-
-      res.send({ users, totalCount });
-    });
-
     // Update user role by email
     app.patch("/users/:email", async (req, res) => {
       try{
@@ -269,6 +246,25 @@ async function run() {
       }
     });
 
+    // Update user info by email
+    app.patch("/users-info/:email", async (req, res) => {
+      try{
+        const email = req.params.email;
+        const  {updatedInfo}  = req.body;
+        console.log("updated Info", updatedInfo);
+
+        const result = await usersCollection.updateOne(
+          { email },
+          { $set: updatedInfo },
+          {upsert: false}
+        );
+
+        res.send(result)
+      } catch (err) {
+        res.status(500).send({ message: "Failed to update user info", err });
+      }
+    });
+
     //Delete application by id
     app.delete("/applications/:id", async( req, res) => {
       try{
@@ -281,22 +277,6 @@ async function run() {
       }
     })
 
-
-    app.patch(
-      "/update-user-status",
-
-      async (req, res) => {
-        const { email, status } = req.body;
-        const result = await usersCollection.updateOne(
-          { email: email },
-          {
-            $set: { status },
-          }
-        );
-
-        res.send(result);
-      }
-    );
 
     console.log("connected");
   } finally {
