@@ -64,12 +64,14 @@ const JWT_SECRET = process.env.JWT_SECRET;
 async function run() {
   try {
     const db = client.db("TourDeshDB");
+    const usersCollection = db.collection("users");
     const applicationsCollection = db.collection("Applications");
-    const packageCollection = db.collection("packages");
-    const userCollection = db.collection("users");
+    const paymentsCollection = db.collection("Payments");
+    const packagesCollection = db.collection("packages");
+    const storiesCollection = db.collection("Stories");
 
     // const verifyAdmin = async (req, res, next) => {
-    //   const user = await userCollection.findOne({
+    //   const user = await usersCollection.findOne({
     //     email: req.firebaseUser.email,
     //   });
 
@@ -89,7 +91,7 @@ async function run() {
         const decoded = await admin.auth().verifyIdToken(idToken);
 
         //get the user from user collection by email
-        const user = await userCollection.findOne({ email: decoded.email });
+        const user = await usersCollection.findOne({ email: decoded.email });
 
         // Example payload (you can add role later)
         const payload = {
@@ -112,12 +114,12 @@ async function run() {
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
 
-      const find_result = await userCollection.findOne({
+      const find_result = await usersCollection.findOne({
         email: userData.email,
       });
 
       if (find_result) {
-        userCollection.updateOne(
+        usersCollection.updateOne(
           { email: userData.email },
           {
             $inc: { loginCount: 1 },
@@ -125,19 +127,42 @@ async function run() {
         );
         res.send({ msg: "user already exist" });
       } else {
-        const result = await userCollection.insertOne(userData);
+        const result = await usersCollection.insertOne(userData);
         res.send(result);
       }
     });
 
     app.get("/get-user-role", async (req, res) => {
-      const user = await userCollection.findOne({
+      const user = await usersCollection.findOne({
         email: req.query.email,
       });
       res.send({ role: user.role });
     });
 
     //Admin apis
+    //GET admin stats
+    app.get("/admin-stats", async ( req, res ) => {
+      try {
+        const totalPayment = await paymentsCollection
+        .aggregate([{ $group: { _id: null, sum: { $sum: "$amount"}}}])
+        .toArray();
+        const totalGuides = await usersCollection.countDocuments({ role: "tour guide"});
+        const totalClients = await usersCollection.countDocuments({ role: "tourist"});
+        const totalPackages = await packagesCollection.estimatedDocumentCount();
+        const totalStories = await storiesCollection.estimatedDocumentCount();
+
+         res.send({
+           totalPayment: totalPayment[0]?.sum || 0,
+           totalGuides,
+           totalClients,
+           totalPackages,
+           totalStories,
+         });
+      } catch (err) {
+        res.status(500).send({message: "Failed to fetch admin stats", err})
+      }
+    })
+
     // GET /users?search=keyword
     app.get("/users", verifyJWT, async (req, res) => {
       try {
@@ -150,7 +175,7 @@ async function run() {
             { email: { $regex: search, $options: "i" } },
           ],
         };
-        const result = await userCollection.find(query).toArray();
+        const result = await usersCollection.find(query).toArray();
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: err.massage });
@@ -179,6 +204,7 @@ async function run() {
             {
               $addFields: {
                 role: "$userInfo.role", // add role field
+                email: "$userInfo.email", // add email field
               },
             },
             {
@@ -201,7 +227,7 @@ async function run() {
     app.post("/add-package", async (req, res) => {
       try {
         const packageInfo = req.body;
-        const result = await packageCollection.insertOne(packageInfo);
+        const result = await packagesCollection.insertOne(packageInfo);
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: err.message });
@@ -215,8 +241,8 @@ async function run() {
       if (filter && filter !== "all") {
         query.status = filter;
       }
-      const totalCount = await userCollection.countDocuments(query);
-      const users = await userCollection
+      const totalCount = await usersCollection.countDocuments(query);
+      const users = await usersCollection
         .find(query)
         .skip((page - 1) * 5)
         .limit(5)
@@ -231,7 +257,7 @@ async function run() {
         const email = req.params.email;
         const { role } = req.body;
 
-        const result = await userCollection.updateOne(
+        const result = await usersCollection.updateOne(
           { email },
           { $set: {role} },
           {upsert: false}
@@ -261,7 +287,7 @@ async function run() {
 
       async (req, res) => {
         const { email, status } = req.body;
-        const result = await userCollection.updateOne(
+        const result = await usersCollection.updateOne(
           { email: email },
           {
             $set: { status },
