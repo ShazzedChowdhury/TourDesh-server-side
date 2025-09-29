@@ -19,26 +19,25 @@ app.use(express.json());
 
 //custom middleware
 const verifyJWT = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    console.log("tokem from headers",authHeader)
+  const authHeader = req.headers.authorization;
+  console.log("tokem from headers", authHeader);
 
-    if( !authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).send({message: "Unauthorized"})
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).send({ message: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  //verify the token
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      res.status(403).send({ message: "Forbidden" });
     }
 
-    const token = authHeader.split(" ")[1];
-
-    //verify the token
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
-      if(err) {
-        res.status(403).send({message: "Forbidden"})
-      }
-
-
-      req.user = decoded;
-      next()
-    })
-}
+    req.user = decoded;
+    next();
+  });
+};
 
 // MongoDB Connection
 const client = new MongoClient(process.env.MONGODB_URI, {
@@ -59,7 +58,6 @@ admin.initializeApp({
 });
 
 const JWT_SECRET = process.env.JWT_SECRET;
-
 
 async function run() {
   try {
@@ -234,8 +232,6 @@ async function run() {
           appliedAt,
         } = req.body;
 
-         
-
         // if (!title || !reason || !cvLink || !email || !displayName) {
         //   return res.status(400).json({ message: "Missing required fields" });
         // }
@@ -318,31 +314,88 @@ async function run() {
       }
     });
 
-    //GET all stories (tourist and tour guide API)
-    app.get("/stories", async ( req, res ) => {
-        try{
-          const { email } = req.query;
+    //GET all stories by email (tourist and tour guide API)
+    app.get("/stories", async (req, res) => {
+      try {
+        const query = {};
+        const { email } = req.query;
 
-          const result = await storiesCollection
-            .find({ addedBy: email })
-            .sort({ createdAt: 1 })
-            .toArray();
-
-          res.send(result);
-        } catch (err) {
-          res.status(500).send({message: "Failed to retrieve stories", err})
+        if (email) {
+          query.addedBy = email;
         }
-    })
+
+        const result = await storiesCollection
+          .find(query)
+          .sort({ createdAt: 1 })
+          .toArray();
+
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to retrieve stories", err });
+      }
+    });
+
+    //GET specific story by id (tourist and tour guide API)
+    app.get("/stories/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const result = await storiesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to retrieve stories", err });
+      }
+    });
 
     //POST stories (tourist and tour guide api)
     app.post("/stories", async (req, res) => {
-      try{
+      try {
         const storyData = req.body;
         const result = await storiesCollection.insertOne(storyData);
-        res.send(result)
+        res.send(result);
       } catch (err) {
-        res.status(500).send({message: "Failed to insert stories", err})
+        res.status(500).send({ message: "Failed to insert stories", err });
       }
+    });
+
+    // PATCH /stories/:id to update stories (tourist and tour guide API)
+    app.patch("/stories/:id", async (req, res) => {
+      const { id } = req.params;
+      const { title, content } = req.body;
+     
+     
+      const result = await storiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            title,
+            content
+          }
+        }
+      );
+      res.json(result);
+    });
+
+    // PATCH /update-stories-img/:id to remove-image and add new image (tourist and tour guide API)
+    app.patch("/update-stories-img/:id", async (req, res) => {
+      const { id } = req.params;
+      const { imgUrl } = req.body;
+      let updatedData = null;
+
+      const story = await storiesCollection.findOne({ _id: new ObjectId(id) });
+
+      if (story.images.includes(imgUrl)) {
+        updatedData = { $pull: { images: imgUrl } };
+      } else {
+        updatedData = { $push: { images: imgUrl } };
+      }
+      const result = await storiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        updatedData
+      );
+      res.json(result);
     });
 
     //DELETE a spedifc story (tourist and tour guide API)
@@ -368,11 +421,9 @@ run().catch(console.dir);
 
 // Root route
 app.get("/", async (req, res) => {
-  res.send('TourDesh server is running.....')
+  res.send("TourDesh server is running.....");
 });
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
 });
-
-
