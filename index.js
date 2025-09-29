@@ -67,6 +67,7 @@ async function run() {
     const paymentsCollection = db.collection("Payments");
     const packagesCollection = db.collection("packages");
     const storiesCollection = db.collection("Stories");
+    const bookingsCollection = db.collection("Bookings");
 
     // const verifyAdmin = async (req, res, next) => {
     //   const user = await usersCollection.findOne({
@@ -178,6 +179,15 @@ async function run() {
       }
     });
 
+    app.get("/get-tour-guides", async (req, res) => {
+        try{
+          const result = await usersCollection.find({ role: "tour guide" }).toArray();
+          res.send(result)
+        } catch (err) {
+          res.status(500).res.send({message: "Failed to fetch tour guide", err})
+        }
+    });
+
     //Get all applications
     app.get("/applications", async (req, res) => {
       try {
@@ -250,6 +260,18 @@ async function run() {
       } catch (error) {
         console.error("Error inserting application:", error);
         res.status(500).json({ message: "Failed to submit application" });
+      }
+    });
+
+    //GET a specific package by id (admin api)
+    app.get("/packages/:id", async (req, res) => {
+      try {
+        const {id} = req.params;
+        console.log("id", id)
+        const result = await packagesCollection.findOne({_id: new ObjectId(id)});
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: err.message });
       }
     });
 
@@ -411,6 +433,17 @@ async function run() {
         res.status(500).json({ message: "Failed to delete story" });
       }
     });
+
+    //POST /bookings to insert a bookings
+    app.post('/bookings', async (req, res) => {
+      try{
+        const bookings = req.body;
+        const result = await bookingsCollection.insertOne(bookings);
+        res.send(result)
+      } catch (err) {
+        res.status(500).send({message: "Failed to insert bookings", err })
+      }
+    })
 
     console.log("connected");
   } finally {
