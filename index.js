@@ -85,7 +85,7 @@ async function run() {
     // Verify Firebase token & issue custom JWT
     app.post("/jwt", async (req, res) => {
       const { idToken } = req.body;
-      console.log("idToken", idToken);
+
       try {
         // Verify Firebase token
         const decoded = await admin.auth().verifyIdToken(idToken);
@@ -135,27 +135,31 @@ async function run() {
 
     //Admin apis
     //GET admin stats
-    app.get("/admin-stats", async ( req, res ) => {
+    app.get("/admin-stats", async (req, res) => {
       try {
         const totalPayment = await paymentsCollection
-        .aggregate([{ $group: { _id: null, sum: { $sum: "$amount"}}}])
-        .toArray();
-        const totalGuides = await usersCollection.countDocuments({ role: "tour guide"});
-        const totalClients = await usersCollection.countDocuments({ role: "tourist"});
+          .aggregate([{ $group: { _id: null, sum: { $sum: "$amount" } } }])
+          .toArray();
+        const totalGuides = await usersCollection.countDocuments({
+          role: "tour guide",
+        });
+        const totalClients = await usersCollection.countDocuments({
+          role: "tourist",
+        });
         const totalPackages = await packagesCollection.estimatedDocumentCount();
         const totalStories = await storiesCollection.estimatedDocumentCount();
 
-         res.send({
-           totalPayment: totalPayment[0]?.sum || 0,
-           totalGuides,
-           totalClients,
-           totalPackages,
-           totalStories,
-         });
+        res.send({
+          totalPayment: totalPayment[0]?.sum || 0,
+          totalGuides,
+          totalClients,
+          totalPackages,
+          totalStories,
+        });
       } catch (err) {
-        res.status(500).send({message: "Failed to fetch admin stats", err})
+        res.status(500).send({ message: "Failed to fetch admin stats", err });
       }
-    })
+    });
 
     // GET /users?search=keyword
     app.get("/users", verifyJWT, async (req, res) => {
@@ -218,6 +222,41 @@ async function run() {
       }
     });
 
+    // POST /applications -> create new application (Tourist api)
+    app.post("/applications", async (req, res) => {
+      try {
+        const {
+          title,
+          reason,
+          cvLink,
+          applicantEmail,
+          applicantName,
+          appliedAt,
+        } = req.body;
+
+         
+
+        // if (!title || !reason || !cvLink || !email || !displayName) {
+        //   return res.status(400).json({ message: "Missing required fields" });
+        // }
+
+        const newApplication = {
+          title,
+          reason,
+          cvLink,
+          applicantEmail,
+          applicantName,
+          appliedAt: appliedAt || new Date().toISOString(),
+        };
+
+        const result = await applicationsCollection.insertOne(newApplication);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error("Error inserting application:", error);
+        res.status(500).json({ message: "Failed to submit application" });
+      }
+    });
+
     app.post("/add-package", async (req, res) => {
       try {
         const packageInfo = req.body;
@@ -230,17 +269,17 @@ async function run() {
 
     // Update user role by email
     app.patch("/users/:email", async (req, res) => {
-      try{
+      try {
         const email = req.params.email;
         const { role } = req.body;
 
         const result = await usersCollection.updateOne(
           { email },
-          { $set: {role} },
-          {upsert: false}
+          { $set: { role } },
+          { upsert: false }
         );
 
-        res.send(result)
+        res.send(result);
       } catch (err) {
         res.status(500).send({ message: "Failed to update role", err });
       }
@@ -248,35 +287,35 @@ async function run() {
 
     // Update user info by email
     app.patch("/users-info/:email", async (req, res) => {
-      try{
+      try {
         const email = req.params.email;
-        const  {updatedInfo}  = req.body;
-        console.log("updated Info", updatedInfo);
+        const { updatedInfo } = req.body;
 
         const result = await usersCollection.updateOne(
           { email },
           { $set: updatedInfo },
-          {upsert: false}
+          { upsert: false }
         );
 
-        res.send(result)
+        res.send(result);
       } catch (err) {
         res.status(500).send({ message: "Failed to update user info", err });
       }
     });
 
     //Delete application by id
-    app.delete("/applications/:id", async( req, res) => {
-      try{
-        const {id} = req.params;
+    app.delete("/applications/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
 
-        const result = await applicationsCollection.deleteOne({ _id: new ObjectId(id)});
-        res.send(result)
-      } catch(err) {
-        res.status(500).send({message: "Failed to delete application", err})
+        const result = await applicationsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to delete application", err });
       }
-    })
-
+    });
 
     console.log("connected");
   } finally {
