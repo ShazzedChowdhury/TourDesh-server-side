@@ -318,6 +318,22 @@ async function run() {
       }
     });
 
+    //GET all stories (tourist and tour guide API)
+    app.get("/stories", async ( req, res ) => {
+        try{
+          const { email } = req.query;
+
+          const result = await storiesCollection
+            .find({ addedBy: email })
+            .sort({ createdAt: 1 })
+            .toArray();
+
+          res.send(result);
+        } catch (err) {
+          res.status(500).send({message: "Failed to retrieve stories", err})
+        }
+    })
+
     //POST stories (tourist and tour guide api)
     app.post("/stories", async (req, res) => {
       try{
@@ -326,6 +342,20 @@ async function run() {
         res.send(result)
       } catch (err) {
         res.status(500).send({message: "Failed to insert stories", err})
+      }
+    });
+
+    //DELETE a spedifc story (tourist and tour guide API)
+    app.delete("/stories/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await storiesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.json(result);
+      } catch (error) {
+        console.error("Error deleting story:", error);
+        res.status(500).json({ message: "Failed to delete story" });
       }
     });
 
