@@ -257,6 +257,7 @@ async function run() {
       }
     });
 
+    //POST package (admin api)
     app.post("/add-package", async (req, res) => {
       try {
         const packageInfo = req.body;
@@ -314,6 +315,17 @@ async function run() {
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: "Failed to delete application", err });
+      }
+    });
+
+    //POST stories (tourist and tour guide api)
+    app.post("/stories", async (req, res) => {
+      try{
+        const storyData = req.body;
+        const result = await storiesCollection.insertOne(storyData);
+        res.send(result)
+      } catch (err) {
+        res.status(500).send({message: "Failed to insert stories", err})
       }
     });
 
