@@ -213,6 +213,24 @@ async function run() {
       }
     });
 
+    // GET /overview
+    app.get("/overview", async (req, res) => {
+      try {
+        const totalPackages = await packagesCollection.countDocuments();
+        const totalGuides = await usersCollection.countDocuments({
+          role: "tour guide",
+        });
+        const totalStories = await storiesCollection.countDocuments();
+        const totalClients = await usersCollection.countDocuments({
+          role: "tourist",
+        });
+
+        res.send({ totalPackages, totalGuides, totalStories, totalClients });
+      } catch (err) {
+        res.status(500).send({ message: err.message });
+      }
+    });
+
     // GET /users?search=keyword
     app.get("/users", verifyJWT, async (req, res) => {
       try {
@@ -483,17 +501,15 @@ async function run() {
 
     //GET random stories by role tourist
     app.get("/stories/random-tourist", async (req, res) => {
-        const limit = parseInt(req.query.limit) || 4;
-        const result = await storiesCollection
-          .aggregate([
-            { $match: { role: "tourist" } },
-            { $sample: { size: limit } },
-          ])
-          .toArray();
-        res.send(result);
-      })
-      
-
+      const limit = parseInt(req.query.limit) || 4;
+      const result = await storiesCollection
+        .aggregate([
+          { $match: { role: "tourist" } },
+          { $sample: { size: limit } },
+        ])
+        .toArray();
+      res.send(result);
+    });
 
     //GET specific story by id (tourist and tour guide API)
     app.get("/stories/:id", async (req, res) => {
