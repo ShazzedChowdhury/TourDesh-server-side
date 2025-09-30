@@ -217,7 +217,10 @@ async function run() {
     app.get("/users", verifyJWT, async (req, res) => {
       try {
         const search = req.query.search || "";
+        const role = req.query.role; // new role filter
         const skipEmail = req.user.email;
+
+        // Build the query
         const query = {
           email: { $ne: skipEmail },
           $or: [
@@ -225,10 +228,16 @@ async function run() {
             { email: { $regex: search, $options: "i" } },
           ],
         };
+
+        // If role filter is provided and not 'all', add to query
+        if (role && role !== "all") {
+          query.role = role;
+        }
+
         const result = await usersCollection.find(query).toArray();
         res.send(result);
       } catch (err) {
-        res.status(500).send({ message: err.massage });
+        res.status(500).send({ message: err.message });
       }
     });
 
@@ -346,7 +355,6 @@ async function run() {
     });
 
     //GET all packages
-    //GET a specific package by id (admin api)
     app.get("/packages", async (req, res) => {
       try {
         const result = await packagesCollection.find().toArray();
