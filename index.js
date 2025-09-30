@@ -459,11 +459,38 @@ async function run() {
       }
     });
 
+    //GET /bookings to get bookings
+    app.get("/bookings", async (req, res) => {
+      try {
+        const query = {};
+        const {email} = req.query;
+
+        if(email) {
+          query.touristEmail = email;
+        }
+        const result = await bookingsCollection.find(query).toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch bookings", err });
+      }
+    });
+
     //POST /bookings to insert a bookings
     app.post("/bookings", async (req, res) => {
       try {
         const bookings = req.body;
         const result = await bookingsCollection.insertOne(bookings);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to insert bookings", err });
+      }
+    });
+
+    //DELETE /bookings to delete a booking
+    app.delete("/bookings/:id", async (req, res) => {
+      try {
+        const {id} = req.params;
+        const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id)});
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: "Failed to insert bookings", err });
