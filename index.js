@@ -439,6 +439,19 @@ async function run() {
       }
     });
 
+    //GET all stories (tourist and tour guide API)
+    app.get("/all-stories", async (req, res) => {
+      try {
+        const result = await storiesCollection
+          .find()
+          .sort({ createdAt: 1 })
+          .toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to retrieve stories", err });
+      }
+    });
+
     //GET all stories by email (tourist and tour guide API)
     app.get("/stories", async (req, res) => {
       try {
@@ -459,6 +472,20 @@ async function run() {
         res.status(500).send({ message: "Failed to retrieve stories", err });
       }
     });
+
+    //GET random stories by role tourist
+    app.get("/stories/random-tourist", async (req, res) => {
+        const limit = parseInt(req.query.limit) || 4;
+        const result = await storiesCollection
+          .aggregate([
+            { $match: { role: "tourist" } },
+            { $sample: { size: limit } },
+          ])
+          .toArray();
+        res.send(result);
+      })
+      
+
 
     //GET specific story by id (tourist and tour guide API)
     app.get("/stories/:id", async (req, res) => {
