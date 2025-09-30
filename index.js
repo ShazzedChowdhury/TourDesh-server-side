@@ -178,14 +178,27 @@ async function run() {
         res.status(500).send({ message: err.massage });
       }
     });
+    app.get("/users/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await usersCollection.findOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: err.massage });
+      }
+    });
 
     app.get("/get-tour-guides", async (req, res) => {
-        try{
-          const result = await usersCollection.find({ role: "tour guide" }).toArray();
-          res.send(result)
-        } catch (err) {
-          res.status(500).res.send({message: "Failed to fetch tour guide", err})
-        }
+      try {
+        const result = await usersCollection
+          .find({ role: "tour guide" })
+          .toArray();
+        res.send(result);
+      } catch (err) {
+        res
+          .status(500)
+          .res.send({ message: "Failed to fetch tour guide", err });
+      }
     });
 
     //Get all applications
@@ -263,12 +276,25 @@ async function run() {
       }
     });
 
+    //GET all packages
+    //GET a specific package by id (admin api)
+    app.get("/packages", async (req, res) => {
+      try {
+        const result = await packagesCollection.find().toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: err.message });
+      }
+    });
+
     //GET a specific package by id (admin api)
     app.get("/packages/:id", async (req, res) => {
       try {
-        const {id} = req.params;
-        console.log("id", id)
-        const result = await packagesCollection.findOne({_id: new ObjectId(id)});
+        const { id } = req.params;
+        console.log("id", id);
+        const result = await packagesCollection.findOne({
+          _id: new ObjectId(id),
+        });
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: err.message });
@@ -386,15 +412,14 @@ async function run() {
     app.patch("/stories/:id", async (req, res) => {
       const { id } = req.params;
       const { title, content } = req.body;
-     
-     
+
       const result = await storiesCollection.updateOne(
         { _id: new ObjectId(id) },
         {
           $set: {
             title,
-            content
-          }
+            content,
+          },
         }
       );
       res.json(result);
@@ -435,15 +460,15 @@ async function run() {
     });
 
     //POST /bookings to insert a bookings
-    app.post('/bookings', async (req, res) => {
-      try{
+    app.post("/bookings", async (req, res) => {
+      try {
         const bookings = req.body;
         const result = await bookingsCollection.insertOne(bookings);
-        res.send(result)
+        res.send(result);
       } catch (err) {
-        res.status(500).send({message: "Failed to insert bookings", err })
+        res.status(500).send({ message: "Failed to insert bookings", err });
       }
-    })
+    });
 
     console.log("connected");
   } finally {
