@@ -3,6 +3,7 @@ dotenv.config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const Stripe = require("stripe");
 const {
   MongoClient,
   ServerApiVersion,
@@ -12,6 +13,7 @@ const {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Middleware
 app.use(cors());
@@ -107,6 +109,57 @@ async function run() {
       } catch (error) {
         console.error("JWT creation error:", error);
         res.status(401).json({ message: "Invalid Firebase token" });
+      }
+    });
+
+    // 1. Create PaymentIntent
+    app.post("/create-payment-intent", async (req, res) => {
+      try {
+        const { price } = req.body;
+        const amount = Math.round(price * 100); // cents
+        console.log("type of", typeof amount);
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+
+        res.send({ clientSecret: paymentIntent.client_secret });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Payment Intent creation failed" });
+      }
+    });
+
+    // 2. Record payment and update booking
+    app.post("/confirm-payment", async (req, res) => {
+      try {
+        const { bookingId, transactionId, paymentBy, amount, packageId } =
+          req.body;
+
+        // Save payment info
+       const paymentInfo = {
+         bookingId,
+         packageId,
+         paymentBy,
+         amount,
+         transactionId,
+         createdAt: new Date(),
+       };
+
+        //inset the payment info into the database
+        await paymentsCollection.insertOne(paymentInfo);
+
+        // Update booking status
+        await bookingsCollection.updateOne(
+          { _id: new ObjectId(bookingId) },
+          { $set: { status: "in review" } }
+        );
+
+        res.send({ message: "Payment successful" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Payment confirmation failed", err });
       }
     });
 
