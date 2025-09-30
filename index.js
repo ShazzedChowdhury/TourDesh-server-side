@@ -463,9 +463,9 @@ async function run() {
     app.get("/bookings", async (req, res) => {
       try {
         const query = {};
-        const {email} = req.query;
+        const { email } = req.query;
 
-        if(email) {
+        if (email) {
           query.touristEmail = email;
         }
         const result = await bookingsCollection.find(query).toArray();
@@ -486,11 +486,26 @@ async function run() {
       }
     });
 
+    //GET /bookings to get a specific booking
+    app.get("/bookings/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await bookingsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to insert bookings", err });
+      }
+    });
+
     //DELETE /bookings to delete a booking
     app.delete("/bookings/:id", async (req, res) => {
       try {
-        const {id} = req.params;
-        const result = await bookingsCollection.deleteOne({ _id: new ObjectId(id)});
+        const { id } = req.params;
+        const result = await bookingsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
         res.send(result);
       } catch (err) {
         res.status(500).send({ message: "Failed to insert bookings", err });
