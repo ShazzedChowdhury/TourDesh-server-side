@@ -231,6 +231,20 @@ async function run() {
         res.status(500).send({ message: err.massage });
       }
     });
+
+    // Get random guides (role = "tour guide")
+    app.get("/users/random-guides", async (req, res) => {
+      const limit = parseInt(req.query.limit) || 6;
+      const result = await usersCollection
+        .aggregate([
+          { $match: { role: "tour guide" } },
+          { $sample: { size: limit } },
+        ])
+        .toArray();
+      res.send(result);
+    });
+
+    //GET a specific user
     app.get("/users/:id", async (req, res) => {
       try {
         const { id } = req.params;
@@ -340,6 +354,14 @@ async function run() {
       } catch (err) {
         res.status(500).send({ message: err.message });
       }
+    });
+    // Get random packages (limit passed in query)
+    app.get("/packages/random", async (req, res) => {
+      const limit = parseInt(req.query.limit) || 3;
+      const result = await packagesCollection
+        .aggregate([{ $sample: { size: limit } }])
+        .toArray();
+      res.send(result);
     });
 
     //GET a specific package by id (admin api)
