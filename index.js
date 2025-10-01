@@ -22,7 +22,7 @@ app.use(express.json());
 //custom middleware
 const verifyJWT = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  console.log("tokem from headers", authHeader);
+  
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     res.status(401).send({ message: "Unauthorized" });
@@ -117,7 +117,7 @@ async function run() {
       try {
         const { price } = req.body;
         const amount = Math.round(price * 100); // cents
-        console.log("type of", typeof amount);
+      
         const paymentIntent = await stripe.paymentIntents.create({
           amount,
           currency: "usd",
@@ -165,7 +165,7 @@ async function run() {
 
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
-
+      
       const find_result = await usersCollection.findOne({
         email: userData.email,
       });
@@ -179,10 +179,14 @@ async function run() {
     });
 
     app.get("/get-user-role", async (req, res) => {
-      const user = await usersCollection.findOne({
+      try {
+        const user = await usersCollection.findOne({
         email: req.query.email,
       });
       res.send({ role: user.role });
+      } catch (err) {
+        res.status(500).send(err)
+      }
     });
 
     //Admin apis
@@ -394,7 +398,6 @@ async function run() {
     app.get("/packages/:id", async (req, res) => {
       try {
         const { id } = req.params;
-        console.log("id", id);
         const result = await packagesCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -437,11 +440,14 @@ async function run() {
     app.patch("/users-info/:email", async (req, res) => {
       try {
         const email = req.params.email;
-        const { updatedInfo } = req.body;
+        const { displayName: userName, photoURL} = req.body.updatedInfo;
 
         const result = await usersCollection.updateOne(
           { email },
-          { $set: updatedInfo },
+          { $set: {
+            userName,
+            photoURL
+          } },
           { upsert: false }
         );
 
