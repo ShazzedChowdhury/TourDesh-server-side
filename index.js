@@ -41,6 +41,7 @@ const verifyJWT = async (req, res, next) => {
   });
 };
 
+
 // MongoDB Connection
 const client = new MongoClient(process.env.MONGODB_URI, {
   serverApi: {
@@ -241,7 +242,10 @@ async function run() {
         const search = req.query.search || "";
         const role = req.query.role; // new role filter
         const skipEmail = req.user.email;
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
 
+        console.log("page and limi", typeof page, limit)
         // Build the query
         const query = {
           email: { $ne: skipEmail },
@@ -256,8 +260,14 @@ async function run() {
           query.role = role;
         }
 
-        const result = await usersCollection.find(query).toArray();
-        res.send(result);
+        const totalDocs = await usersCollection.countDocuments(query);
+        const users = await usersCollection.find(query).skip((page - 1) * limit).limit(limit).toArray();
+
+        res.send({
+          users,
+          page,
+          pages:  Math.ceil(totalDocs / limit)
+        });
       } catch (err) {
         res.status(500).send({ message: err.message });
       }
@@ -302,7 +312,11 @@ async function run() {
     //Get all applications
     app.get("/applications", async (req, res) => {
       try {
-        const result = await applicationsCollection
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
+
+        const totalDocs = await applicationsCollection.estimatedDocumentCount();
+        const applications = await applicationsCollection
           .aggregate([
             {
               $lookup: {
@@ -330,9 +344,17 @@ async function run() {
               },
             },
           ])
+          .skip((page -1) * limit)
+          .limit(limit)
           .toArray();
 
-        res.status(200).send(result);
+        res
+        .status(200)
+        .send({
+          applications,
+          page,
+          pages: Math.ceil( totalDocs / limit )
+        });
       } catch (error) {
         res.status(500).json({
           success: false,
