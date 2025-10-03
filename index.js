@@ -192,7 +192,7 @@ async function run() {
 
     //Admin apis
     //GET admin stats
-    app.get("/admin-stats", async (req, res) => {
+    app.get("/admin-stats",verifyJWT, async (req, res) => {
       try {
         const totalPayment = await paymentsCollection
           .aggregate([{ $group: { _id: null, sum: { $sum: "$amount" } } }])
@@ -245,7 +245,7 @@ async function run() {
         const page = parseInt(req.query.page);
         const limit = parseInt(req.query.limit);
 
-        console.log("page and limi", typeof page, limit)
+       
         // Build the query
         const query = {
           email: { $ne: skipEmail },
@@ -310,7 +310,7 @@ async function run() {
     });
 
     //Get all applications
-    app.get("/applications", async (req, res) => {
+    app.get("/applications", verifyJWT, async (req, res) => {
       try {
         const page = parseInt(req.query.page);
         const limit = parseInt(req.query.limit);
@@ -616,7 +616,7 @@ async function run() {
     });
 
     //GET /bookings to get bookings
-    app.get("/bookings", async (req, res) => {
+    app.get("/bookings", verifyJWT, async (req, res) => {
       try {
         const query = {};
         const { email, guideEmail } = req.query;
@@ -635,7 +635,7 @@ async function run() {
     });
 
     //GET /bookings to get a specific booking
-    app.get("/bookings/:id", async (req, res) => {
+    app.get("/bookings/:id", verifyJWT, async (req, res) => {
       try {
         const { id } = req.params;
         const result = await bookingsCollection.findOne({
@@ -643,7 +643,7 @@ async function run() {
         });
         res.send(result);
       } catch (err) {
-        res.status(500).send({ message: "Failed to insert bookings", err });
+        res.status(500).send({ message: "Failed to fetch bookings", err });
       }
     });
 
