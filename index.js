@@ -14,9 +14,17 @@ const {
 const app = express();
 const PORT = process.env.PORT || 5000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://tourdesh-project-client.web.app/", // your frontend deploy URL
+];
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ["GET","POST", "DELETE", "PATCH", "OPTiONS"],
+  credentials: true
+}));
 app.use(express.json());
 
 //custom middleware
@@ -164,6 +172,15 @@ async function run() {
       }
     });
 
+
+    //get all payments
+    app.get("/payments", async (req, res) => {
+      const payments = await paymentsCollection.find()
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.send(payments);
+    });
+
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
       
@@ -190,7 +207,47 @@ async function run() {
       }
     });
 
-    //Admin apis
+   
+    //GET user stats
+    app.get("/user-stats",verifyJWT, async (req, res) => {
+      try {
+        const {email} = req.user;
+   
+       const totalPayment = await paymentsCollection
+         .aggregate([
+           {
+             $match: {
+               paymentBy: email,
+             }, // filter by specific email
+           },
+           {
+             $group: {
+               _id: null, // no grouping key needed since it's one user
+               sum: { $sum: "$amount" }, // sum the amount
+             },
+           },
+         ])
+         .toArray();
+        const totalPending = await bookingsCollection.countDocuments({
+          status: "pending",
+        });
+        const totalAccepted = await bookingsCollection.countDocuments({
+          status: "accepted",
+        });
+        const totalStories = await storiesCollection.countDocuments({
+          addedBy: email,
+        });
+
+        res.send({
+          totalPayment: totalPayment[0]?.sum || 0,
+          totalPending,
+          totalAccepted,
+          totalStories,
+        });
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch admin stats", err });
+      }
+    });
     //GET admin stats
     app.get("/admin-stats",verifyJWT, async (req, res) => {
       try {
@@ -401,8 +458,20 @@ async function run() {
     //GET all packages
     app.get("/packages", async (req, res) => {
       try {
-        const result = await packagesCollection.find().toArray();
-        res.send(result);
+        const {sort} = req.query;
+
+       if(sort) {
+         const result = await packagesCollection
+           .find()
+           .sort({ price: parseInt(sort) })
+           .toArray();
+           res.send(result);
+       }
+
+        const result = await packagesCollection
+          .find()
+          .toArray();
+          res.send(result);
       } catch (err) {
         res.status(500).send({ message: err.message });
       }
