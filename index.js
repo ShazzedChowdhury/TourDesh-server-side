@@ -16,13 +16,13 @@ const PORT = process.env.PORT || 5000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://tourdesh-project-client.web.app/", // your frontend deploy URL
+  "https://tourdesh-project-client.web.app", // your frontend deploy URL
 ];
 
 // Middleware
 app.use(cors({
   origin: allowedOrigins,
-  methods: ["GET","POST", "DELETE", "PATCH", "OPTiONS"],
+  methods: ["GET","POST", "DELETE", "PATCH", "OPTIONS"],
   credentials: true
 }));
 app.use(express.json());
@@ -79,6 +79,8 @@ async function run() {
     const packagesCollection = db.collection("packages");
     const storiesCollection = db.collection("Stories");
     const bookingsCollection = db.collection("Bookings");
+    const blogsCollection = db.collection("Blogs");
+    const reviewsCollection = db.collection("Reviews");
 
     // const verifyAdmin = async (req, res, next) => {
     //   const user = await usersCollection.findOne({
@@ -174,12 +176,54 @@ async function run() {
 
 
     //get all payments
-    app.get("/payments", async (req, res) => {
+    app.get("/payments",verifyJWT, async (req, res) => {
       const payments = await paymentsCollection.find()
         .sort({ createdAt: -1 })
         .toArray();
       res.send(payments);
     });
+
+    // app.get("/payments/:email", verifyJWT, async (req, res) => {
+    //   try {
+    //     const { email } = req.params; // Logged-in user's email
+    //     console.log("user", email)
+    //     const payments = await paymentsCollection
+    //       .aggregate([
+    //         { $match: { paymentBy: email } }, // Only payments by this user
+    //         {
+    //           $group: {
+    //             _id: "$packageId",
+    //             totalAmount: { $sum: "$amount" }, // sum of payments per package
+    //           },
+    //         },
+    //         {
+    //           $lookup: {
+    //             from: "packages",
+    //             localField: "_id",
+    //             foreignField: "_id",
+    //             as: "package",
+    //           },
+    //         },
+    //         { $unwind: "$package" }, // Flatten package array
+    //         {
+    //           $project: {
+    //             _id: 0,
+    //             packageId: "$_id",
+    //             packageTitle: "$package.title",
+    //             packagePrice: "$package.price", // Include package price
+    //             totalAmount: 1,
+    //           },
+    //         },
+    //         { $sort: { totalAmount: -1 } }, // Optional: sort by highest payment
+    //       ])
+    //       .toArray();
+
+    //     res.send( payments );
+    //   } catch (err) {
+    //     console.error(err);
+    //     res.status(500).send({ message: "Failed to fetch user payments", err });
+    //   }
+    // });
 
     app.post("/add-user", async (req, res) => {
       const userData = req.body;
@@ -750,6 +794,27 @@ async function run() {
         res.status(500).send({ message: "Failed to insert bookings", err });
       }
     });
+
+    //blogs related apis
+    //GET /blogs route
+    app.get("/blogs", async(req, res) => {
+      const limit = parseInt(req.query.limit);
+      try{
+        const result = await blogsCollection.find({}).limit(limit).toArray();
+        res.send(result)
+      } catch{
+        res.status(500).send({message: "Failed to retrieve blogs", err: err.message})
+      }
+    })
+    //GET /reviews route
+    app.get("/reviews", async(req, res) => {
+      try{
+        const result = await reviewsCollection.find({}).toArray();
+        res.send(result)
+      } catch{
+        res.status(500).send({message: "Failed to retrieve reviews", err: err.message})
+      }
+    })
 
     console.log("connected");
   } finally {
